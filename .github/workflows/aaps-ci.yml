@@ -1,3 +1,4 @@
+
 name: AAPS CI
 
 on:
@@ -11,6 +12,7 @@ on:
         options:
           # ── Development (JDK 21) ────────────────────────
           - dev
+          - o5-testing
           # ── 4.0.x beta (JDK 21) ─────────────────────────
           - 4.0.0-beta1
           # ── 3.4.x (JDK 21) ──────────────────────────────
@@ -132,7 +134,7 @@ jobs:
 
       - name: Validating keystore, alias and password
         run: |
-          set -x
+          set -e
           echo "🔐 Validating keystore, alias and password"
 
           # Create a dummy JAR file (quick method using zip)
@@ -155,9 +157,6 @@ jobs:
           fi
           rm -f "$JARSIGNER_LOG" dummy.jar
           echo "✅ Keystore, alias, and key password are valid."
-
-          rm -f "$KEYTOOL_LOG"
-          echo "✅ Keystore and credentials validated."
 
       - name: Decode GDrive OAuth2 secrets
         run: |
@@ -198,13 +197,19 @@ jobs:
 
       - name: Fetch selected source from upstream
         run: |
-          git remote add upstream https://github.com/nightscout/AndroidAPS.git || true
-          if [[ "${{ github.event.inputs.tagName }}" == "dev" ]]; then
-            git fetch upstream refs/heads/dev:refs/remotes/upstream/dev
-            echo "✅ Development branch fetched from upstream."
+          set -euo pipefail
+          if [[ "${{ github.event.inputs.tagName }}" == "o5-testing" ]]; then
+            git fetch origin refs/heads/o5-testing:refs/remotes/origin/o5-testing
+            echo "✅ O5 testing branch fetched from my repository."
           else
-            git fetch upstream refs/tags/${{ github.event.inputs.tagName }}:refs/tags/${{ github.event.inputs.tagName }}
-            echo "✅ Selected tag fetched from upstream."
+            git remote add upstream https://github.com/nightscout/AndroidAPS.git || true
+            if [[ "${{ github.event.inputs.tagName }}" == "dev" ]]; then
+              git fetch upstream refs/heads/dev:refs/remotes/upstream/dev
+              echo "✅ Development branch fetched from upstream."
+            else
+              git fetch upstream refs/tags/${{ github.event.inputs.tagName }}:refs/tags/${{ github.event.inputs.tagName }}
+              echo "✅ Selected tag fetched from upstream."
+            fi
           fi
 
       - name: Determine JVM version from tag
@@ -224,7 +229,12 @@ jobs:
 
       - name: Switch to selected source
         run: |
-          if [[ "${{ github.event.inputs.tagName }}" == "dev" ]]; then
+          set -euo pipefail
+          if [[ "${{ github.event.inputs.tagName }}" == "o5-testing" ]]; then
+            git checkout --detach refs/remotes/origin/o5-testing
+            grep -Fq "include ':pump:omnipod:omnipod5'" settings.gradle
+            echo "✅ Checked out O5 testing source with Omnipod 5 module."
+          elif [[ "${{ github.event.inputs.tagName }}" == "dev" ]]; then
             git checkout --detach refs/remotes/upstream/dev
             echo "✅ Checked out latest AAPS dev branch."
           else
@@ -253,6 +263,9 @@ jobs:
             VERSION="$BRANCH_NAME"
           else
             VERSION=$(grep 'val appVersion' buildSrc/src/main/kotlin/Versions.kt | awk -F '"' '{print $2}')
+          fi
+          if [[ "${{ github.event.inputs.tagName }}" == "o5-testing" ]]; then
+            VERSION="${VERSION}-o5-testing"
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
