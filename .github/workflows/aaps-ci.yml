@@ -9,6 +9,8 @@ on:
         default: '3.4.2.6'
         type: choice
         options:
+          # ── Development (JDK 21) ────────────────────────
+          - dev
           # ── 4.0.x beta (JDK 21) ─────────────────────────
           - 4.0.0-beta1
           # ── 3.4.x (JDK 21) ──────────────────────────────
@@ -170,7 +172,6 @@ jobs:
 
           echo "GDRIVE_CLIENT_ID=$GDRIVE_CLIENT_ID" >> $GITHUB_ENV
           echo "GDRIVE_REFRESH_TOKEN=$GDRIVE_REFRESH_TOKEN" >> $GITHUB_ENV
-
           echo "✅ GDRIVE_CLIENT_ID and GDRIVE_REFRESH_TOKEN extracted from GDRIVE_OAUTH2"
 
       - name: Retrieving Google Drive access token
@@ -195,11 +196,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch selected tag from upstream
+      - name: Fetch selected source from upstream
         run: |
           git remote add upstream https://github.com/nightscout/AndroidAPS.git || true
-          git fetch upstream refs/tags/${{ github.event.inputs.tagName }}:refs/tags/${{ github.event.inputs.tagName }}
-          echo "✅ Tag ${{ github.event.inputs.tagName }} fetched from upstream."
+          if [[ "${{ github.event.inputs.tagName }}" == "dev" ]]; then
+            git fetch upstream refs/heads/dev:refs/remotes/upstream/dev
+            echo "✅ Development branch fetched from upstream."
+          else
+            git fetch upstream refs/tags/${{ github.event.inputs.tagName }}:refs/tags/${{ github.event.inputs.tagName }}
+            echo "✅ Selected tag fetched from upstream."
+          fi
 
       - name: Determine JVM version from tag
         run: |
@@ -216,10 +222,15 @@ jobs:
           echo "JAVA_VERSION=$JAVA_VERSION" >> $GITHUB_ENV
           echo "ℹ️ Tag $TAG → JDK $JAVA_VERSION (from jdk-map.json)"
 
-      - name: Switch to selected tag
+      - name: Switch to selected source
         run: |
-          git checkout refs/tags/${{ github.event.inputs.tagName }}
-          echo "✅ Checked out tag ${{ github.event.inputs.tagName }}"
+          if [[ "${{ github.event.inputs.tagName }}" == "dev" ]]; then
+            git checkout --detach refs/remotes/upstream/dev
+            echo "✅ Checked out latest AAPS dev branch."
+          else
+            git checkout refs/tags/${{ github.event.inputs.tagName }}
+            echo "✅ Checked out selected AAPS tag."
+          fi
 
       - name: Set BUILD_VARIANT
         run: |
@@ -372,3 +383,4 @@ jobs:
       workflow_name: 'AAPS CI'
       keep_runs: 20
       keep_threshold: 5
+      
