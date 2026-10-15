@@ -1,0 +1,37 @@
+
+name: Import Omnipod 5
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Import developer branch
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git ls-remote --exit-code \
+            --heads origin o5-testing >/dev/null 2>&1; then
+            echo "Branch o5-testing already exists."
+            exit 1
+          fi
+
+          git fetch \
+            https://github.com/premnirmal/AndroidAPS.git \
+            refs/heads/o5-testing
+
+          git push origin FETCH_HEAD:refs/heads/o5-testing
+
+          echo "Omnipod 5 branch imported!"
+          
